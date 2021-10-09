@@ -43,20 +43,13 @@ to quickly create a Cobra application.`,
 }
 
 var (
-	filename string
-	threads  int
-	deep     int
+	deep int
 )
 
 func init() {
 	scanCmd.AddCommand(sslCmd)
 
-	sslCmd.Flags().StringVarP(&filename, "filename", "f", "", "domain list filename")
-	sslCmd.Flags().IntVarP(&threads, "threads", "t", 64, "total threads to use")
 	sslCmd.Flags().IntVarP(&deep, "deep", "d", 0, "deep subdomain")
-
-	sslCmd.MarkFlagFilename("filename")
-	sslCmd.MarkFlagRequired("filename")
 }
 
 var (
@@ -98,7 +91,7 @@ func scan(wg *sync.WaitGroup, queue <-chan string) {
 }
 
 func run(cmd *cobra.Command, args []string) {
-	domainListFile, err := os.Open(filename)
+	domainListFile, err := os.Open(scanFlagFilename)
 	if err != nil {
 		panic(err)
 	}
@@ -107,7 +100,7 @@ func run(cmd *cobra.Command, args []string) {
 	queue := make(chan string)
 	wg := &sync.WaitGroup{}
 
-	for i := 0; i < threads; i++ {
+	for i := 0; i < scanFlagThreads; i++ {
 		go scan(wg, queue)
 	}
 

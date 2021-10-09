@@ -36,6 +36,11 @@ to quickly create a Cobra application.`,
 	},
 }
 
+var (
+	scanFlagFilename string
+	scanFlagThreads  int
+)
+
 func init() {
 	rootCmd.AddCommand(scanCmd)
 
@@ -48,4 +53,10 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// scanCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+
+	sslCmd.PersistentFlags().StringVarP(&scanFlagFilename, "filename", "f", "", "domain list filename")
+	sslCmd.PersistentFlags().IntVarP(&scanFlagThreads, "threads", "t", 64, "total threads to use")
+
+	sslCmd.MarkFlagFilename("filename")
+	sslCmd.MarkFlagRequired("filename")
 }
