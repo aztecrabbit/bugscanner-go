@@ -9,6 +9,10 @@ var scanCmd = &cobra.Command{
 	Short: "Subcommand for scanning",
 }
 
+var scanFlagThreads int
+
 func init() {
 	rootCmd.AddCommand(scanCmd)
+
+	scanCmd.PersistentFlags().IntVarP(&scanFlagThreads, "threads", "t", 64, "total threads to use")
 }

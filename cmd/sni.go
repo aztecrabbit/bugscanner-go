@@ -22,19 +22,17 @@ var sniCmd = &cobra.Command{
 }
 
 var (
-	sslFlagFilename string
-	sslFlagThreads  int
-	sslFlagDeep     int
-	sslFlagTimeout  int
+	sniFlagFilename string
+	sniFlagDeep     int
+	sniFlagTimeout  int
 )
 
 func init() {
 	scanCmd.AddCommand(sniCmd)
 
-	sniCmd.Flags().StringVarP(&sslFlagFilename, "filename", "f", "", "domain list filename")
-	sniCmd.Flags().IntVarP(&sslFlagThreads, "threads", "t", 64, "total threads to use")
-	sniCmd.Flags().IntVarP(&sslFlagDeep, "deep", "d", 0, "deep subdomain")
-	sniCmd.Flags().IntVar(&sslFlagTimeout, "timeout", 10, "handshake timeout")
+	sniCmd.Flags().StringVarP(&sniFlagFilename, "filename", "f", "", "domain list filename")
+	sniCmd.Flags().IntVarP(&sniFlagDeep, "deep", "d", 0, "deep subdomain")
+	sniCmd.Flags().IntVar(&sniFlagTimeout, "timeout", 10, "handshake timeout")
 
 	sniCmd.MarkFlagFilename("filename")
 	sniCmd.MarkFlagRequired("filename")
@@ -79,7 +77,7 @@ func scanSNI(domain string) {
 	})
 	defer tlsConn.Close()
 
-	ctxTimeout, _ := context.WithTimeout(context.Background(), time.Duration(sslFlagTimeout)*time.Second)
+	ctxTimeout, _ := context.WithTimeout(context.Background(), time.Duration(sniFlagTimeout)*time.Second)
 	err = tlsConn.HandshakeContext(ctxTimeout)
 	if err != nil {
 		printSNIResult(false, domain)
@@ -103,9 +101,9 @@ func workerSNI(wg *sync.WaitGroup, queue <-chan string) {
 }
 
 func runSNI(cmd *cobra.Command, args []string) {
-	domainListFile, err := os.Open(sslFlagFilename)
+	domainListFile, err := os.Open(sniFlagFilename)
 	if err != nil {
-		fmt.Printf("Opening file \"%s\" error: %s\n", sslFlagFilename, err.Error())
+		fmt.Printf("Opening file \"%s\" error: %s\n", sniFlagFilename, err.Error())
 		os.Exit(1)
 	}
 	defer domainListFile.Close()
@@ -114,10 +112,10 @@ func runSNI(cmd *cobra.Command, args []string) {
 	scanner := bufio.NewScanner(domainListFile)
 	for scanner.Scan() {
 		domain := scanner.Text()
-		if sslFlagDeep > 0 {
+		if sniFlagDeep > 0 {
 			domainSplit := strings.Split(domain, ".")
-			if len(domainSplit) >= sslFlagDeep {
-				domain = strings.Join(domainSplit[len(domainSplit)-sslFlagDeep:], ".")
+			if len(domainSplit) >= sniFlagDeep {
+				domain = strings.Join(domainSplit[len(domainSplit)-sniFlagDeep:], ".")
 			}
 		}
 		mapDomainList[domain] = true
@@ -130,7 +128,7 @@ func runSNI(cmd *cobra.Command, args []string) {
 	queue := make(chan string)
 	wg := &sync.WaitGroup{}
 
-	for i := 0; i < sslFlagThreads; i++ {
+	for i := 0; i < scanFlagThreads; i++ {
 		go workerSNI(wg, queue)
 	}
 
