@@ -3,7 +3,9 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"sync"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -35,6 +37,11 @@ func init() {
 	// when this action is called directly.
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
+
+var (
+	colorG1 = color.New(color.FgGreen, color.Bold)
+	mx      = &sync.Mutex{}
+)
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {

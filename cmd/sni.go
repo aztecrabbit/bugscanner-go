@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
@@ -37,11 +36,6 @@ func init() {
 	sniCmd.MarkFlagFilename("filename")
 	sniCmd.MarkFlagRequired("filename")
 }
-
-var (
-	colorG1 = color.New(color.FgGreen, color.Bold)
-	mx      sync.Mutex
-)
 
 func printSNITableHeader() {
 	fmt.Println("status  server name indication")
