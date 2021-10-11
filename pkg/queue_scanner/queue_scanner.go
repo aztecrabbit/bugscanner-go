@@ -62,11 +62,11 @@ func (c *Ctx) ScanFailed(a interface{}, fn func()) {
 	c.ScanFailedList = append(c.ScanFailedList, a)
 }
 
-type QueueScannerScanFunc func(c *Ctx, a interface{})
 type QueueScannerScanParams struct {
 	Name string
 	Data interface{}
 }
+type QueueScannerScanFunc func(c *Ctx, a *QueueScannerScanParams)
 type QueueScannerDoneFunc func(c *Ctx)
 
 type QueueScanner struct {
@@ -106,7 +106,7 @@ func (s *QueueScanner) run() {
 		}
 
 		s.ctx.LogReplacef("%v", a.Name)
-		s.scanFunc(s.ctx, a.Data)
+		s.scanFunc(s.ctx, a)
 
 		s.ctx.mx.Lock()
 		s.ctx.ScanComplete++

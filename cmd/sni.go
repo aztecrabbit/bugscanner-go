@@ -32,26 +32,33 @@ func init() {
 
 	sniCmd.Flags().StringVarP(&sniFlagFilename, "filename", "f", "", "domain list filename")
 	sniCmd.Flags().IntVarP(&sniFlagDeep, "deep", "d", 0, "deep subdomain")
-	sniCmd.Flags().IntVar(&sniFlagTimeout, "timeout", 10, "handshake timeout")
+	sniCmd.Flags().IntVar(&sniFlagTimeout, "timeout", 3, "handshake timeout")
 
 	sniCmd.MarkFlagFilename("filename")
 	sniCmd.MarkFlagRequired("filename")
 }
 
-func scanSNI(c *queue_scanner.Ctx, a interface{}) {
-	domain := a.(string)
+func scanSNI(c *queue_scanner.Ctx, p *queue_scanner.QueueScannerScanParams) {
+	domain := p.Data.(string)
 
 	//
 
-	conn, err := net.DialTimeout("tcp", "93.184.216.34:443", 10*time.Second)
-	if err != nil {
-		if e, ok := err.(net.Error); ok && e.Timeout() {
+	var conn net.Conn
+	var err error
+
+	for {
+		conn, err = net.DialTimeout("tcp", "93.184.216.34:443", 3*time.Second)
+		if err != nil {
+			if e, ok := err.(net.Error); ok && e.Timeout() {
+				c.LogReplace(p.Name, "-", "Dial Timeout")
+				continue
+			}
+			c.Logf("Dial error: %s", err.Error())
 			return
 		}
-		c.Log(err.Error())
-		return
+		defer conn.Close()
+		break
 	}
-	defer conn.Close()
 
 	tlsConn := tls.Client(conn, &tls.Config{
 		ServerName:         domain,
@@ -59,8 +66,9 @@ func scanSNI(c *queue_scanner.Ctx, a interface{}) {
 	})
 	defer tlsConn.Close()
 
-	ctxTimeout, _ := context.WithTimeout(context.Background(), time.Duration(sniFlagTimeout)*time.Second)
-	err = tlsConn.HandshakeContext(ctxTimeout)
+	ctxHandshake, ctxHandshakeCancel := context.WithTimeout(context.Background(), time.Duration(sniFlagTimeout)*time.Second)
+	defer ctxHandshakeCancel()
+	err = tlsConn.HandshakeContext(ctxHandshake)
 	if err != nil {
 		c.ScanFailed(domain, nil)
 		return

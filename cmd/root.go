@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"sync"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -40,7 +39,7 @@ func init() {
 
 var (
 	colorG1 = color.New(color.FgGreen, color.Bold)
-	mx      = &sync.Mutex{}
+	colorG2 = color.New(color.FgGreen)
 )
 
 // initConfig reads in config file and ENV variables if set.
