@@ -95,7 +95,10 @@ func runScanSNI(cmd *cobra.Command, args []string) {
 
 	queueScanner := queue_scanner.NewQueueScanner(scanFlagThreads, scanSNI, nil)
 	for domain := range mapDomainList {
-		queueScanner.Add(domain)
+		queueScanner.Add(&queue_scanner.QueueScannerScanParams{
+			Name: domain,
+			Data: domain,
+		})
 	}
 	queueScanner.Start()
 }

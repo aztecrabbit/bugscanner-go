@@ -12,7 +12,7 @@ type Ctx struct {
 	ScanFailedList  []interface{}
 	ScanComplete    int
 
-	dataList []interface{}
+	dataList []*QueueScannerScanParams
 
 	mx sync.Mutex
 	context.Context
@@ -41,35 +41,39 @@ func (c *Ctx) LogReplacef(f string, a ...interface{}) {
 }
 
 func (c *Ctx) ScanSuccess(a interface{}, fn func()) {
+	c.mx.Lock()
+	defer c.mx.Unlock()
+
 	if fn != nil {
 		fn()
 	}
-
-	c.mx.Lock()
-	defer c.mx.Unlock()
 
 	c.ScanSuccessList = append(c.ScanSuccessList, a)
 }
 
 func (c *Ctx) ScanFailed(a interface{}, fn func()) {
+	c.mx.Lock()
+	defer c.mx.Unlock()
+
 	if fn != nil {
 		fn()
 	}
-
-	c.mx.Lock()
-	defer c.mx.Unlock()
 
 	c.ScanFailedList = append(c.ScanFailedList, a)
 }
 
 type QueueScannerScanFunc func(c *Ctx, a interface{})
+type QueueScannerScanParams struct {
+	Name string
+	Data interface{}
+}
 type QueueScannerDoneFunc func(c *Ctx)
 
 type QueueScanner struct {
 	threads  int
 	scanFunc QueueScannerScanFunc
 	doneFunc QueueScannerDoneFunc
-	queue    chan interface{}
+	queue    chan *QueueScannerScanParams
 	wg       sync.WaitGroup
 
 	ctx *Ctx
@@ -80,7 +84,7 @@ func NewQueueScanner(threads int, scanFunc QueueScannerScanFunc, doneFunc QueueS
 		threads:  threads,
 		scanFunc: scanFunc,
 		doneFunc: doneFunc,
-		queue:    make(chan interface{}),
+		queue:    make(chan *QueueScannerScanParams),
 		ctx:      &Ctx{},
 	}
 
@@ -100,18 +104,19 @@ func (s *QueueScanner) run() {
 		if !ok {
 			break
 		}
-		s.ctx.LogReplacef("%v", a)
-		s.scanFunc(s.ctx, a)
+
+		s.ctx.LogReplacef("%v", a.Name)
+		s.scanFunc(s.ctx, a.Data)
 
 		s.ctx.mx.Lock()
 		s.ctx.ScanComplete++
 		s.ctx.mx.Unlock()
 
-		s.ctx.LogReplacef("%v", a)
+		s.ctx.LogReplacef("%v", a.Name)
 	}
 }
 
-func (s *QueueScanner) Add(dataList ...interface{}) {
+func (s *QueueScanner) Add(dataList ...*QueueScannerScanParams) {
 	s.ctx.dataList = append(s.ctx.dataList, dataList...)
 }
 
