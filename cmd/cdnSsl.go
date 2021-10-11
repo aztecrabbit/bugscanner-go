@@ -131,7 +131,6 @@ func scanCdnSsl(c *queue_scanner.Ctx, a interface{}) {
 	}
 
 	c.ScanSuccess(args, func() {
-		lineList = append(lineList, fmt.Sprint(strings.ReplaceAll(strings.ReplaceAll(args.Payload, "\r", "\\r"), "\n", "\\n")))
 		c.Log(colorG1.Sprintf("%-21s  %s -- %s", proxyHostPort, args.Target, strings.Join(lineList, " -- ")))
 	})
 }
