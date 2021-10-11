@@ -116,7 +116,14 @@ func scanCdnSsl(c *queue_scanner.Ctx, p *queue_scanner.QueueScannerScanParams) {
 				c.LogReplace(p.Name, "-", "Dial Timeout")
 				continue
 			}
-			c.Logf("Dial error: %s", err.Error())
+			if opError, ok := err.(*net.OpError); ok {
+				if syscalErr, ok := opError.Err.(*os.SyscallError); ok {
+					if syscalErr.Err.Error() == "network is unreachable" {
+						return
+					}
+				}
+			}
+			c.Log(err.Error())
 			return
 		}
 		defer conn.Close()
