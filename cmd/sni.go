@@ -46,7 +46,12 @@ func scanSNI(c *queue_scanner.Ctx, p *queue_scanner.QueueScannerScanParams) {
 	var conn net.Conn
 	var err error
 
+	dialCount := 0
 	for {
+		dialCount++
+		if dialCount > 3 {
+			return
+		}
 		conn, err = net.DialTimeout("tcp", "93.184.216.34:443", 3*time.Second)
 		if err != nil {
 			if e, ok := err.(net.Error); ok && e.Timeout() {
@@ -81,7 +86,7 @@ func scanSNI(c *queue_scanner.Ctx, p *queue_scanner.QueueScannerScanParams) {
 func runScanSNI(cmd *cobra.Command, args []string) {
 	domainListFile, err := os.Open(sniFlagFilename)
 	if err != nil {
-		fmt.Printf("Opening file \"%s\" error: %s\n", sniFlagFilename, err.Error())
+		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 	defer domainListFile.Close()

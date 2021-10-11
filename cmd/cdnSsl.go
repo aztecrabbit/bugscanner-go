@@ -21,10 +21,11 @@ var cdnSsl = &cobra.Command{
 }
 
 var (
-	cdnSslFlagProxyCidr string
-	cdnSslFlagProxyPort int
-	cdnSslFlagMethod    string
-	cdnSslFlagTarget    string
+	cdnSslFlagProxyCidr         string
+	cdnSslFlagProxyHostFilename string
+	cdnSslFlagProxyPort         int
+	cdnSslFlagMethod            string
+	cdnSslFlagTarget            string
 
 	cdnSslFlagPath     string
 	cdnSslFlagScheme   string
@@ -36,11 +37,11 @@ var (
 func init() {
 	scanCmd.AddCommand(cdnSsl)
 
+	cdnSsl.Flags().StringVar(&cdnSslFlagProxyHostFilename, "proxy-filename", "", "cdn proxy filename without port")
 	cdnSsl.Flags().StringVarP(&cdnSslFlagProxyCidr, "cidr", "c", "", "cidr cdn proxy to scan e.g. 127.0.0.1/32")
 	cdnSsl.Flags().IntVarP(&cdnSslFlagProxyPort, "port", "p", 443, "proxy port")
 	cdnSsl.Flags().StringVarP(&cdnSslFlagMethod, "method", "M", "HEAD", "request method")
 	cdnSsl.Flags().StringVarP(&cdnSslFlagTarget, "target", "T", "", "target domain cdn")
-
 	cdnSsl.Flags().StringVar(&cdnSslFlagPath, "path", "[scheme][target]", "request path")
 	cdnSsl.Flags().StringVar(&cdnSslFlagScheme, "scheme", "ws://", "request scheme")
 	cdnSsl.Flags().StringVar(&cdnSslFlagProtocol, "protocol", "HTTP/1.1", "request protocol")
@@ -49,6 +50,7 @@ func init() {
 	)
 	cdnSsl.Flags().IntVar(&cdnSslFlagTimeout, "timeout", 3, "handshake timeout")
 
+	cdnSsl.MarkFlagFilename("proxy-filename")
 	cdnSsl.MarkFlagRequired("target")
 
 	cdnSslFlagMethod = strings.ToUpper(cdnSslFlagMethod)
@@ -102,7 +104,12 @@ func scanCdnSsl(c *queue_scanner.Ctx, p *queue_scanner.QueueScannerScanParams) {
 	var conn net.Conn
 	var err error
 
+	dialCount := 0
 	for {
+		dialCount++
+		if dialCount > 3 {
+			return
+		}
 		conn, err = net.DialTimeout("tcp", proxyHostPort, 3*time.Second)
 		if err != nil {
 			if e, ok := err.(net.Error); ok && e.Timeout() {
@@ -176,17 +183,40 @@ func scanCdnSsl(c *queue_scanner.Ctx, p *queue_scanner.QueueScannerScanParams) {
 }
 
 func runScanCdnSsl(cmd *cobra.Command, args []string) {
-	ipList, err := ipListFromCidr(cdnSslFlagProxyCidr)
-	if err != nil {
-		fmt.Printf("Converting ip list from cidr error: %s", err.Error())
-		os.Exit(1)
+	proxyHostList := make(map[string]bool)
+
+	if cdnSslFlagProxyHostFilename != "" {
+		proxyHostFile, err := os.Open(cdnSslFlagProxyHostFilename)
+		if err != nil {
+			fmt.Println(err.Error())
+			os.Exit(1)
+		}
+		defer proxyHostFile.Close()
+
+		scanner := bufio.NewScanner(proxyHostFile)
+		for scanner.Scan() {
+			proxyHost := scanner.Text()
+			proxyHostList[proxyHost] = true
+		}
+	}
+
+	if cdnSslFlagProxyCidr != "" {
+		proxyHostListFromCidr, err := ipListFromCidr(cdnSslFlagProxyCidr)
+		if err != nil {
+			fmt.Printf("Converting ip list from cidr error: %s", err.Error())
+			os.Exit(1)
+		}
+
+		for _, proxyHost := range proxyHostListFromCidr {
+			proxyHostList[proxyHost] = true
+		}
 	}
 
 	//
 
 	queueScanner := queue_scanner.NewQueueScanner(scanFlagThreads, scanCdnSsl, nil)
 
-	for _, proxyHost := range ipList {
+	for proxyHost := range proxyHostList {
 		payload := cdnSslFlagPayload
 		payload = strings.ReplaceAll(payload, "[method]", cdnSslFlagMethod)
 		payload = strings.ReplaceAll(payload, "[path]", cdnSslFlagPath)
