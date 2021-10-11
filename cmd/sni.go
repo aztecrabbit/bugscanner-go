@@ -8,16 +8,17 @@ import (
 	"net"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
+
+	"github.com/aztecrabbit/bugscanner-go/pkg/queue_scanner"
 )
 
 var sniCmd = &cobra.Command{
 	Use:   "sni",
 	Short: "Scan server name indication list from file",
-	Run:   runSNI,
+	Run:   runScanSNI,
 }
 
 var (
@@ -37,30 +38,17 @@ func init() {
 	sniCmd.MarkFlagRequired("filename")
 }
 
-func printSNITableHeader() {
-	fmt.Println("status  server name indication")
-	fmt.Println("------  ----------------------")
-}
+func scanSNI(c *queue_scanner.Ctx, a interface{}) {
+	domain := a.(string)
 
-func printSNIResult(status bool, domain string) {
-	mx.Lock()
-	defer mx.Unlock()
+	//
 
-	f := "%-6s  %s\n"
-	if status {
-		colorG1.Printf(f, "True", domain)
-	} else {
-		fmt.Printf(f, "", domain)
-	}
-}
-
-func scanSNI(domain string) {
 	conn, err := net.DialTimeout("tcp", "93.184.216.34:443", 10*time.Second)
 	if err != nil {
 		if e, ok := err.(net.Error); ok && e.Timeout() {
 			return
 		}
-		fmt.Println(err.Error())
+		c.Log(err.Error())
 		return
 	}
 	defer conn.Close()
@@ -74,27 +62,15 @@ func scanSNI(domain string) {
 	ctxTimeout, _ := context.WithTimeout(context.Background(), time.Duration(sniFlagTimeout)*time.Second)
 	err = tlsConn.HandshakeContext(ctxTimeout)
 	if err != nil {
-		printSNIResult(false, domain)
+		c.ScanFailed(domain, nil)
 		return
 	}
-	printSNIResult(true, domain)
+	c.ScanSuccess(domain, func() {
+		c.Log(colorG1.Sprint(domain))
+	})
 }
 
-func workerSNI(wg *sync.WaitGroup, queue <-chan string) {
-	wg.Add(1)
-	defer wg.Done()
-
-	for {
-		domain, ok := <-queue
-		if !ok {
-			break
-		}
-
-		scanSNI(domain)
-	}
-}
-
-func runSNI(cmd *cobra.Command, args []string) {
+func runScanSNI(cmd *cobra.Command, args []string) {
 	domainListFile, err := os.Open(sniFlagFilename)
 	if err != nil {
 		fmt.Printf("Opening file \"%s\" error: %s\n", sniFlagFilename, err.Error())
@@ -117,19 +93,9 @@ func runSNI(cmd *cobra.Command, args []string) {
 
 	//
 
-	printSNITableHeader()
-
-	queue := make(chan string)
-	wg := &sync.WaitGroup{}
-
-	for i := 0; i < scanFlagThreads; i++ {
-		go workerSNI(wg, queue)
-	}
-
+	queueScanner := queue_scanner.NewQueueScanner(scanFlagThreads, scanSNI, nil)
 	for domain := range mapDomainList {
-		queue <- domain
+		queueScanner.Add(domain)
 	}
-	close(queue)
-
-	wg.Wait()
+	queueScanner.Start()
 }
