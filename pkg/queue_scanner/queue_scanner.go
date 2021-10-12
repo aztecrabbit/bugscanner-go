@@ -79,11 +79,10 @@ type QueueScanner struct {
 	ctx *Ctx
 }
 
-func NewQueueScanner(threads int, scanFunc QueueScannerScanFunc, doneFunc QueueScannerDoneFunc) *QueueScanner {
+func NewQueueScanner(threads int, scanFunc QueueScannerScanFunc) *QueueScanner {
 	t := &QueueScanner{
 		threads:  threads,
 		scanFunc: scanFunc,
-		doneFunc: doneFunc,
 		queue:    make(chan *QueueScannerScanParams),
 		ctx:      &Ctx{},
 	}
@@ -121,7 +120,7 @@ func (s *QueueScanner) Add(dataList ...*QueueScannerScanParams) {
 	s.ctx.dataList = append(s.ctx.dataList, dataList...)
 }
 
-func (s *QueueScanner) Start() {
+func (s *QueueScanner) Start(doneFunc QueueScannerDoneFunc) {
 	for _, data := range s.ctx.dataList {
 		s.queue <- data
 	}
@@ -129,7 +128,7 @@ func (s *QueueScanner) Start() {
 
 	s.wg.Wait()
 
-	if s.doneFunc != nil {
-		s.doneFunc(s.ctx)
+	if doneFunc != nil {
+		doneFunc(s.ctx)
 	}
 }

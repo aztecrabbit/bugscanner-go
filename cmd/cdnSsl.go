@@ -46,7 +46,7 @@ func init() {
 	cdnSsl.Flags().StringVar(&cdnSslFlagScheme, "scheme", "ws://", "request scheme")
 	cdnSsl.Flags().StringVar(&cdnSslFlagProtocol, "protocol", "HTTP/1.1", "request protocol")
 	cdnSsl.Flags().StringVar(
-		&cdnSslFlagPayload, "payload", "[method] [path] [protocol]\r\nHost: [target]\r\nUpgrade: websocket\r\n\r\n", "request payload for sending throught cdn proxy",
+		&cdnSslFlagPayload, "payload", "[method] [path] [protocol][crlf]Host: [target][crlf]Upgrade: websocket[crlf][crlf]", "request payload for sending throught cdn proxy",
 	)
 	cdnSsl.Flags().IntVar(&cdnSslFlagTimeout, "timeout", 3, "handshake timeout")
 
@@ -83,23 +83,25 @@ func ipListFromCidr(cidr string) ([]string, error) {
 	return ips[1 : len(ips)-1], nil
 }
 
-type scanCdnSslParams struct {
-	ProxyHost string
-	ProxyPort int
-	Method    string
-	Target    string
-	Payload   string
+type scanCdnSslRequest struct {
+	ProxyHostPort string
+	Method        string
+	Target        string
+	Payload       string
+}
+
+type scanCdnSslResponse struct {
+	Request    *scanCdnSslRequest
+	HeaderList []string
 }
 
 func scanCdnSsl(c *queue_scanner.Ctx, p *queue_scanner.QueueScannerScanParams) {
-	args, ok := p.Data.(*scanCdnSslParams)
+	req, ok := p.Data.(*scanCdnSslRequest)
 	if !ok {
 		return
 	}
 
 	//
-
-	proxyHostPort := fmt.Sprintf("%s:%d", args.ProxyHost, args.ProxyPort)
 
 	var conn net.Conn
 	var err error
@@ -110,7 +112,7 @@ func scanCdnSsl(c *queue_scanner.Ctx, p *queue_scanner.QueueScannerScanParams) {
 		if dialCount > 3 {
 			return
 		}
-		conn, err = net.DialTimeout("tcp", proxyHostPort, 3*time.Second)
+		conn, err = net.DialTimeout("tcp", req.ProxyHostPort, 3*time.Second)
 		if err != nil {
 			if e, ok := err.(net.Error); ok && e.Timeout() {
 				c.LogReplace(p.Name, "-", "Dial Timeout")
@@ -131,14 +133,14 @@ func scanCdnSsl(c *queue_scanner.Ctx, p *queue_scanner.QueueScannerScanParams) {
 	}
 
 	tlsConn := tls.Client(conn, &tls.Config{
-		ServerName:         args.Target,
+		ServerName:         req.Target,
 		InsecureSkipVerify: true,
 	})
 	ctxHandshake, ctxHandshakeCancel := context.WithTimeout(context.Background(), time.Duration(cdnSslFlagTimeout)*time.Second)
 	defer ctxHandshakeCancel()
 	err = tlsConn.HandshakeContext(ctxHandshake)
 	if err != nil {
-		c.ScanFailed(args, nil)
+		c.ScanFailed(req, nil)
 		return
 	}
 
@@ -150,13 +152,21 @@ func scanCdnSsl(c *queue_scanner.Ctx, p *queue_scanner.QueueScannerScanParams) {
 	chanResult := make(chan bool)
 
 	go func() {
-		_, err = tlsConn.Write([]byte(args.Payload))
+		payload := req.Payload
+		payload = strings.ReplaceAll(payload, "\\r", "\r")
+		payload = strings.ReplaceAll(payload, "\\n", "\n")
+
+		_, err = tlsConn.Write([]byte(payload))
 		if err != nil {
 			return
 		}
 
+		res := &scanCdnSslResponse{
+			Request:    req,
+			HeaderList: make([]string, 0),
+		}
+
 		scanner := bufio.NewScanner(tlsConn)
-		lineList := make([]string, 0)
 		isPrefix := true
 		for scanner.Scan() {
 			line := scanner.Text()
@@ -165,17 +175,17 @@ func scanCdnSsl(c *queue_scanner.Ctx, p *queue_scanner.QueueScannerScanParams) {
 			}
 			if isPrefix || strings.HasPrefix(line, "Location") || strings.HasPrefix(line, "Server") {
 				isPrefix = false
-				lineList = append(lineList, line)
+				res.HeaderList = append(res.HeaderList, line)
 			}
 		}
 
-		if len(lineList) == 0 {
-			c.Log(colorG2.Sprintf("%-21s  %s", proxyHostPort, args.Target))
+		if len(res.HeaderList) == 0 {
+			c.Log(colorG2.Sprintf("%-21s  %s", req.ProxyHostPort, req.Target))
 			return
 		}
 
-		c.ScanSuccess(args, func() {
-			c.Log(colorG1.Sprintf("%-21s  %s -- %s", proxyHostPort, args.Target, strings.Join(lineList, " -- ")))
+		c.ScanSuccess(res, func() {
+			c.Log(colorG1.Sprintf("%-21s  %s -- %s", req.ProxyHostPort, req.Target, strings.Join(res.HeaderList, " -- ")))
 		})
 
 		chanResult <- true
@@ -187,6 +197,23 @@ func scanCdnSsl(c *queue_scanner.Ctx, p *queue_scanner.QueueScannerScanParams) {
 	case <-ctxResultTimeout.Done():
 		return
 	}
+}
+
+func getScanCdnSslPayloadDecoded(target ...string) string {
+	payload := cdnSslFlagPayload
+	payload = strings.ReplaceAll(payload, "[method]", cdnSslFlagMethod)
+	payload = strings.ReplaceAll(payload, "[path]", cdnSslFlagPath)
+	payload = strings.ReplaceAll(payload, "[scheme]", cdnSslFlagScheme)
+	payload = strings.ReplaceAll(payload, "[protocol]", cdnSslFlagProtocol)
+	payload = strings.ReplaceAll(payload, "[crlf]", "[cr][lf]")
+	payload = strings.ReplaceAll(payload, "[cr]", "\r")
+	payload = strings.ReplaceAll(payload, "[lf]", "\n")
+	payload = strings.ReplaceAll(payload, "\r", "\\r")
+	payload = strings.ReplaceAll(payload, "\n", "\\n")
+	if len(target) > 0 {
+		payload = strings.ReplaceAll(payload, "[target]", target[0])
+	}
+	return payload
 }
 
 func runScanCdnSsl(cmd *cobra.Command, args []string) {
@@ -221,24 +248,16 @@ func runScanCdnSsl(cmd *cobra.Command, args []string) {
 
 	//
 
-	queueScanner := queue_scanner.NewQueueScanner(scanFlagThreads, scanCdnSsl, nil)
+	queueScanner := queue_scanner.NewQueueScanner(scanFlagThreads, scanCdnSsl)
 
 	for proxyHost := range proxyHostList {
-		payload := cdnSslFlagPayload
-		payload = strings.ReplaceAll(payload, "[method]", cdnSslFlagMethod)
-		payload = strings.ReplaceAll(payload, "[path]", cdnSslFlagPath)
-		payload = strings.ReplaceAll(payload, "[scheme]", cdnSslFlagScheme)
-		payload = strings.ReplaceAll(payload, "[target]", cdnSslFlagTarget)
-		payload = strings.ReplaceAll(payload, "[protocol]", cdnSslFlagProtocol)
-
 		queueScanner.Add(&queue_scanner.QueueScannerScanParams{
 			Name: fmt.Sprintf("%s:%d - %s", proxyHost, cdnSslFlagProxyPort, cdnSslFlagTarget),
-			Data: &scanCdnSslParams{
-				ProxyHost: proxyHost,
-				ProxyPort: cdnSslFlagProxyPort,
-				Method:    cdnSslFlagMethod,
-				Target:    cdnSslFlagTarget,
-				Payload:   payload,
+			Data: &scanCdnSslRequest{
+				ProxyHostPort: fmt.Sprintf("%s:%d", proxyHost, cdnSslFlagProxyPort),
+				Method:        cdnSslFlagMethod,
+				Target:        cdnSslFlagTarget,
+				Payload:       getScanCdnSslPayloadDecoded(cdnSslFlagTarget),
 			},
 		})
 	}
@@ -251,5 +270,30 @@ func runScanCdnSsl(cmd *cobra.Command, args []string) {
 	// 	os.Exit(0)
 	// }()
 
-	queueScanner.Start()
+	fmt.Printf("%s\n\n", getScanCdnSslPayloadDecoded())
+
+	queueScanner.Start(func(c *queue_scanner.Ctx) {
+		if len(c.ScanSuccessList) == 0 {
+			return
+		}
+
+		c.Logf("\n#\n#\n")
+
+		for _, a := range c.ScanSuccessList {
+			res, ok := a.(*scanCdnSslResponse)
+			if !ok {
+				continue
+			}
+			c.Log(colorG1.Sprint(strings.Join(
+				[]string{
+					fmt.Sprintf("Proxy         : %s", res.Request.ProxyHostPort),
+					fmt.Sprintf("Target        : %s", res.Request.Target),
+					fmt.Sprintf("Response      : %s", strings.Join(res.HeaderList, " -- ")),
+					fmt.Sprintf("Payload       : %s", res.Request.Payload),
+					"",
+				},
+				"\n",
+			)))
+		}
+	})
 }
