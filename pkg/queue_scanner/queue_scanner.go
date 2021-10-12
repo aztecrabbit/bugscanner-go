@@ -19,11 +19,11 @@ type Ctx struct {
 }
 
 func (c *Ctx) Log(a ...interface{}) {
-	fmt.Printf("\r\033[2K%s\n", a...)
+	fmt.Printf("\r\033[2K%s\n", fmt.Sprint(a...))
 }
 
 func (c *Ctx) Logf(f string, a ...interface{}) {
-	fmt.Printf("\r\033[2K%s\n", fmt.Sprintf(f, a...))
+	c.Log(fmt.Sprintf(f, a...))
 }
 
 func (c *Ctx) LogReplace(a ...string) {
@@ -105,14 +105,15 @@ func (s *QueueScanner) run() {
 			break
 		}
 
-		s.ctx.LogReplacef("%v", a.Name)
+		s.ctx.LogReplace(a.Name)
+
 		s.scanFunc(s.ctx, a)
 
 		s.ctx.mx.Lock()
 		s.ctx.ScanComplete++
 		s.ctx.mx.Unlock()
 
-		s.ctx.LogReplacef("%v", a.Name)
+		s.ctx.LogReplace(a.Name)
 	}
 }
 
