@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+
+	terminal "github.com/wayneashleyberry/terminal-dimensions"
 )
 
 type Ctx struct {
@@ -33,6 +35,15 @@ func (c *Ctx) LogReplace(a ...string) {
 	s := fmt.Sprintf(
 		"  %.2f%% - C: %d / %d - S: %d - F: %d - %s", scanCompletePercentage, c.ScanComplete, len(c.dataList), scanSuccess, scanFailed, strings.Join(a, " "),
 	)
+
+	termWidth, _, err := terminal.Dimensions()
+	if err == nil {
+		w := int(termWidth) - 3
+		if len(s) >= w {
+			s = s[:w] + "..."
+		}
+	}
+
 	fmt.Print("\r\033[2K", s, "\r")
 }
 
