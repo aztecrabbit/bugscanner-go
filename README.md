@@ -59,7 +59,7 @@ How to find cidr of cdn? Just googling `cdn-name cidr` e.g. `cloudflare cidr`, e
 Updating
 --------
 
-	go get -v github.com/aztecrabbit/bugscanner-go@master
+	GOPROXY=direct go get -v github.com/aztecrabbit/bugscanner-go
 
 
 About
