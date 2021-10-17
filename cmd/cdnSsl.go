@@ -15,7 +15,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var cdnSsl = &cobra.Command{
+var scanCdnSslCmd = &cobra.Command{
 	Use:   "cdn-ssl",
 	Short: "Scan cdn ssl proxy -> payload -> ssl target",
 	Run:   runScanCdnSsl,
@@ -37,26 +37,26 @@ var (
 )
 
 func init() {
-	scanCmd.AddCommand(cdnSsl)
+	scanCmd.AddCommand(scanCdnSslCmd)
 
-	cdnSsl.Flags().StringVar(&cdnSslFlagProxyHostFilename, "proxy-filename", "", "cdn proxy filename without port")
-	cdnSsl.Flags().StringVarP(&cdnSslFlagProxyCidr, "cidr", "c", "", "cidr cdn proxy to scan e.g. 127.0.0.1/32")
-	cdnSsl.Flags().IntVarP(&cdnSslFlagProxyPort, "port", "p", 443, "proxy port")
-	cdnSsl.Flags().StringVarP(&cdnSslFlagMethod, "method", "M", "HEAD", "request method")
-	cdnSsl.Flags().StringVar(&cdnSslFlagTargetFilename, "target-filename", "", "target domain cdn filename")
-	cdnSsl.Flags().StringVar(&cdnSslFlagTarget, "target", "", "target domain cdn")
-	cdnSsl.Flags().StringVar(&cdnSslFlagPath, "path", "[scheme][target]", "request path")
-	cdnSsl.Flags().StringVar(&cdnSslFlagScheme, "scheme", "ws://", "request scheme")
-	cdnSsl.Flags().StringVar(&cdnSslFlagProtocol, "protocol", "HTTP/1.1", "request protocol")
-	cdnSsl.Flags().StringVar(
+	scanCdnSslCmd.Flags().StringVar(&cdnSslFlagProxyHostFilename, "proxy-filename", "", "cdn proxy filename without port")
+	scanCdnSslCmd.Flags().StringVarP(&cdnSslFlagProxyCidr, "cidr", "c", "", "cidr cdn proxy to scan e.g. 127.0.0.1/32")
+	scanCdnSslCmd.Flags().IntVarP(&cdnSslFlagProxyPort, "port", "p", 443, "proxy port")
+	scanCdnSslCmd.Flags().StringVarP(&cdnSslFlagMethod, "method", "M", "HEAD", "request method")
+	scanCdnSslCmd.Flags().StringVar(&cdnSslFlagTargetFilename, "target-filename", "", "target domain cdn filename")
+	scanCdnSslCmd.Flags().StringVar(&cdnSslFlagTarget, "target", "", "target domain cdn")
+	scanCdnSslCmd.Flags().StringVar(&cdnSslFlagPath, "path", "[scheme][target]", "request path")
+	scanCdnSslCmd.Flags().StringVar(&cdnSslFlagScheme, "scheme", "ws://", "request scheme")
+	scanCdnSslCmd.Flags().StringVar(&cdnSslFlagProtocol, "protocol", "HTTP/1.1", "request protocol")
+	scanCdnSslCmd.Flags().StringVar(
 		&cdnSslFlagPayload, "payload", "[method] [path] [protocol][crlf]Host: [host][crlf]Upgrade: websocket[crlf][crlf]", "request payload for sending throught cdn proxy",
 	)
-	cdnSsl.Flags().IntVar(&cdnSslFlagTimeout, "timeout", 3, "handshake timeout")
-	cdnSsl.Flags().StringVarP(&cdnSslFlagOutput, "output", "o", "", "output result")
+	scanCdnSslCmd.Flags().IntVar(&cdnSslFlagTimeout, "timeout", 3, "handshake timeout")
+	scanCdnSslCmd.Flags().StringVarP(&cdnSslFlagOutput, "output", "o", "", "output result")
 
-	cdnSsl.MarkFlagFilename("proxy-filename")
-	cdnSsl.MarkFlagFilename("target-filename")
-	cdnSsl.MarkFlagFilename("output")
+	scanCdnSslCmd.MarkFlagFilename("proxy-filename")
+	scanCdnSslCmd.MarkFlagFilename("target-filename")
+	scanCdnSslCmd.MarkFlagFilename("output")
 
 	cdnSslFlagMethod = strings.ToUpper(cdnSslFlagMethod)
 }
@@ -315,7 +315,7 @@ func runScanCdnSsl(cmd *cobra.Command, args []string) {
 		fmt.Println(string(jsonBytes))
 
 		if cdnSslFlagOutput != "" {
-			err := os.WriteFile(cdnSslFlagOutput, jsonBytes, os.ModePerm)
+			err := os.WriteFile(cdnSslFlagOutput, jsonBytes, 0644)
 			if err != nil {
 				fmt.Println(err.Error())
 				os.Exit(1)

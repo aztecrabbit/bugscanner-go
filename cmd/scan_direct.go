@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/aztecrabbit/bugscanner-go/pkg/queue_scanner"
@@ -24,6 +25,7 @@ var scanDirectCmd = &cobra.Command{
 var (
 	scanDirectFlagFilename string
 	scanDirectFlagTimeout  int
+	scanDirectFlagOutput   string
 )
 
 func init() {
@@ -31,6 +33,7 @@ func init() {
 
 	scanDirectCmd.Flags().StringVarP(&scanDirectFlagFilename, "filename", "f", "", "domain list filename")
 	scanDirectCmd.Flags().IntVar(&scanDirectFlagTimeout, "timeout", 3, "connect timeout")
+	scanDirectCmd.Flags().StringVarP(&scanDirectFlagOutput, "output", "o", "", "output result")
 
 	scanDirectCmd.MarkFlagFilename("filename")
 	scanDirectCmd.MarkFlagRequired("filename")
@@ -40,6 +43,13 @@ type scanDirectRequest struct {
 	IP     string
 	Domain string
 	Server string
+}
+
+type scanDirectResponse struct {
+	Request    *scanDirectRequest
+	StatusCode int
+	Server     string
+	Location   string
 }
 
 var httpClient = &http.Client{
@@ -86,7 +96,14 @@ func scanDirect(c *queue_scanner.Ctx, p *queue_scanner.QueueScannerScanParams) {
 
 	if hServer == req.Server {
 		s = colorG1.Sprint(s)
-		c.ScanSuccess(req, nil)
+
+		res := &scanDirectResponse{
+			Request:    req,
+			StatusCode: httpRes.StatusCode,
+			Server:     httpRes.Header.Get("Server"),
+			Location:   httpRes.Header.Get("Location"),
+		}
+		c.ScanSuccess(res, nil)
 	}
 
 	c.Log(s)
@@ -140,5 +157,31 @@ func scanDirectRun(cmd *cobra.Command, args []string) {
 			},
 		})
 	}
-	queueScanner.Start(nil)
+	queueScanner.Start(func(c *queue_scanner.Ctx) {
+		if len(c.ScanSuccessList) == 0 {
+			return
+		}
+
+		c.Log("")
+
+		ipList := make([]string, 0)
+
+		for _, data := range c.ScanSuccessList {
+			res, ok := data.(*scanDirectResponse)
+			if !ok {
+				continue
+			}
+			ip := res.Request.IP
+			ipList = append(ipList, ip)
+			c.Log(colorG1.Sprint(ip))
+		}
+
+		if scanDirectFlagOutput != "" {
+			err := os.WriteFile(scanDirectFlagOutput, []byte(strings.Join(ipList, "\n")), 0644)
+			if err != nil {
+				fmt.Println(err.Error())
+				os.Exit(1)
+			}
+		}
+	})
 }
