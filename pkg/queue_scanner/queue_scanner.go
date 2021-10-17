@@ -83,7 +83,6 @@ type QueueScannerDoneFunc func(c *Ctx)
 type QueueScanner struct {
 	threads  int
 	scanFunc QueueScannerScanFunc
-	doneFunc QueueScannerDoneFunc
 	queue    chan *QueueScannerScanParams
 	wg       sync.WaitGroup
 
