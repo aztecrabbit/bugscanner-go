@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/aztecrabbit/bugscanner-go/pkg/queue_scanner"
 	"github.com/spf13/cobra"
@@ -50,6 +51,7 @@ var httpClient = &http.Client{
 			InsecureSkipVerify: true,
 		},
 	},
+	Timeout: 10 * time.Second,
 }
 
 func scanDirect(c *queue_scanner.Ctx, p *queue_scanner.QueueScannerScanParams) {
@@ -114,7 +116,9 @@ func scanDirectRun(cmd *cobra.Command, args []string) {
 
 	for domain := range domainList {
 		fmt.Printf("\r\033[2KResolving %s\r", domain)
-		netIPList, err := net.DefaultResolver.LookupIP(ctx, "ip4", domain)
+		ctxTimeout, cancel := context.WithTimeout(ctx, 3*time.Second)
+		defer cancel()
+		netIPList, err := net.DefaultResolver.LookupIP(ctxTimeout, "ip4", domain)
 		if err != nil {
 			continue
 		}
