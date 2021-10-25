@@ -23,6 +23,7 @@ var scanCdnSslCmd = &cobra.Command{
 
 var (
 	cdnSslFlagProxyCidr         string
+	cdnSslFlagProxyHost         string
 	cdnSslFlagProxyHostFilename string
 	cdnSslFlagProxyPort         int
 	cdnSslFlagMethod            string
@@ -39,8 +40,9 @@ var (
 func init() {
 	scanCmd.AddCommand(scanCdnSslCmd)
 
-	scanCdnSslCmd.Flags().StringVar(&cdnSslFlagProxyHostFilename, "proxy-filename", "", "cdn proxy filename without port")
 	scanCdnSslCmd.Flags().StringVarP(&cdnSslFlagProxyCidr, "cidr", "c", "", "cidr cdn proxy to scan e.g. 127.0.0.1/32")
+	scanCdnSslCmd.Flags().StringVar(&cdnSslFlagProxyHost, "proxy", "", "cdn proxy without port")
+	scanCdnSslCmd.Flags().StringVar(&cdnSslFlagProxyHostFilename, "proxy-filename", "", "cdn proxy filename without port")
 	scanCdnSslCmd.Flags().IntVarP(&cdnSslFlagProxyPort, "port", "p", 443, "proxy port")
 	scanCdnSslCmd.Flags().StringVarP(&cdnSslFlagMethod, "method", "M", "HEAD", "request method")
 	scanCdnSslCmd.Flags().StringVar(&cdnSslFlagTargetFilename, "target-filename", "", "target domain cdn filename")
@@ -220,6 +222,10 @@ func getScanCdnSslPayloadDecoded(target ...string) string {
 
 func runScanCdnSsl(cmd *cobra.Command, args []string) {
 	proxyHostList := make(map[string]bool)
+
+	if cdnSslFlagProxyHost != "" {
+			proxyHostList[cdnSslFlagProxyHost] = true
+	}
 
 	if cdnSslFlagProxyHostFilename != "" {
 		proxyHostFile, err := os.Open(cdnSslFlagProxyHostFilename)
