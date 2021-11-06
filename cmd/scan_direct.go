@@ -95,15 +95,18 @@ func scanDirect(c *queue_scanner.Ctx, p *queue_scanner.QueueScannerScanParams) {
 	)
 
 	if hServer == req.Server {
-		s = colorG1.Sprint(s)
-
-		res := &scanDirectResponse{
-			Request:    req,
-			StatusCode: httpRes.StatusCode,
-			Server:     httpRes.Header.Get("Server"),
-			Location:   httpRes.Header.Get("Location"),
+		if req.Server == "cloudflare" && httpRes.StatusCode != 403 {
+			// Scan failed
+		} else {
+			s = colorG1.Sprint(s)
+			res := &scanDirectResponse{
+				Request:    req,
+				StatusCode: httpRes.StatusCode,
+				Server:     httpRes.Header.Get("Server"),
+				Location:   httpRes.Header.Get("Location"),
+			}
+			c.ScanSuccess(res, nil)
 		}
-		c.ScanSuccess(res, nil)
 	}
 
 	c.Log(s)
