@@ -56,10 +56,6 @@ func init() {
 	scanCdnSslCmd.Flags().IntVar(&cdnSslFlagTimeout, "timeout", 3, "handshake timeout")
 	scanCdnSslCmd.Flags().StringVarP(&cdnSslFlagOutput, "output", "o", "", "output result")
 
-	scanCdnSslCmd.MarkFlagFilename("proxy-filename")
-	scanCdnSslCmd.MarkFlagFilename("target-filename")
-	scanCdnSslCmd.MarkFlagFilename("output")
-
 	cdnSslFlagMethod = strings.ToUpper(cdnSslFlagMethod)
 }
 
@@ -224,7 +220,7 @@ func runScanCdnSsl(cmd *cobra.Command, args []string) {
 	proxyHostList := make(map[string]bool)
 
 	if cdnSslFlagProxyHost != "" {
-			proxyHostList[cdnSslFlagProxyHost] = true
+		proxyHostList[cdnSslFlagProxyHost] = true
 	}
 
 	if cdnSslFlagProxyHostFilename != "" {
@@ -283,6 +279,9 @@ func runScanCdnSsl(cmd *cobra.Command, args []string) {
 
 	for proxyHost := range proxyHostList {
 		for target := range targetList {
+			if target == "direct" {
+				target = proxyHost
+			}
 			queueScanner.Add(&queue_scanner.QueueScannerScanParams{
 				Name: fmt.Sprintf("%s:%d - %s", proxyHost, cdnSslFlagProxyPort, target),
 				Data: &scanCdnSslRequest{
