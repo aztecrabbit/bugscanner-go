@@ -40,13 +40,13 @@ func init() {
 }
 
 type scanDirectRequest struct {
-	IP     string
 	Domain string
 	Server string
 }
 
 type scanDirectResponse struct {
 	Request    *scanDirectRequest
+	NetIPList  []net.IP
 	StatusCode int
 	Server     string
 	Location   string
@@ -64,12 +64,24 @@ var httpClient = &http.Client{
 	Timeout: 10 * time.Second,
 }
 
+var ctxBackground = context.Background()
+
 func scanDirect(c *queue_scanner.Ctx, p *queue_scanner.QueueScannerScanParams) {
 	req := p.Data.(*scanDirectRequest)
 
 	//
 
-	httpReq, err := http.NewRequest("HEAD", fmt.Sprintf("http://%s", req.IP), nil)
+	ctxTimeout, cancel := context.WithTimeout(ctxBackground, 3*time.Second)
+	defer cancel()
+	netIPList, err := net.DefaultResolver.LookupIP(ctxTimeout, "ip4", req.Domain)
+	if err != nil {
+		return
+	}
+	ip := netIPList[0].String()
+
+	//
+
+	httpReq, err := http.NewRequest("HEAD", fmt.Sprintf("http://%s", req.Domain), nil)
 	if err != nil {
 		return
 	}
@@ -87,7 +99,7 @@ func scanDirect(c *queue_scanner.Ctx, p *queue_scanner.QueueScannerScanParams) {
 
 	s := fmt.Sprintf(
 		"%-15s  %-3d  %-16s    %s%s",
-		req.IP,
+		ip,
 		httpRes.StatusCode,
 		hServer,
 		req.Domain,
@@ -95,18 +107,15 @@ func scanDirect(c *queue_scanner.Ctx, p *queue_scanner.QueueScannerScanParams) {
 	)
 
 	if hServer == req.Server {
-		if req.Server == "cloudflare" && httpRes.StatusCode != 403 {
-			// Scan failed
-		} else {
-			s = colorG1.Sprint(s)
-			res := &scanDirectResponse{
-				Request:    req,
-				StatusCode: httpRes.StatusCode,
-				Server:     httpRes.Header.Get("Server"),
-				Location:   httpRes.Header.Get("Location"),
-			}
-			c.ScanSuccess(res, nil)
+		s = colorG1.Sprint(s)
+		res := &scanDirectResponse{
+			Request:    req,
+			NetIPList:  netIPList,
+			StatusCode: httpRes.StatusCode,
+			Server:     httpRes.Header.Get("Server"),
+			Location:   httpRes.Header.Get("Location"),
 		}
+		c.ScanSuccess(res, nil)
 	}
 
 	c.Log(s)
@@ -130,31 +139,11 @@ func scanDirectRun(cmd *cobra.Command, args []string) {
 
 	//
 
-	IPList := make(map[string]string)
-
-	ctx := context.Background()
-
-	for domain := range domainList {
-		fmt.Printf("\r\033[2KResolving %s\r", domain)
-		ctxTimeout, cancel := context.WithTimeout(ctx, 3*time.Second)
-		defer cancel()
-		netIPList, err := net.DefaultResolver.LookupIP(ctxTimeout, "ip4", domain)
-		if err != nil {
-			continue
-		}
-		for _, ip := range netIPList {
-			IPList[ip.String()] = domain
-		}
-	}
-
-	//
-
 	queueScanner := queue_scanner.NewQueueScanner(scanFlagThreads, scanDirect)
-	for ip, domain := range IPList {
+	for domain, _ := range domainList {
 		queueScanner.Add(&queue_scanner.QueueScannerScanParams{
 			Name: domain,
 			Data: &scanDirectRequest{
-				IP:     ip,
 				Domain: domain,
 				Server: "cloudflare",
 			},
@@ -167,20 +156,45 @@ func scanDirectRun(cmd *cobra.Command, args []string) {
 
 		c.Log("")
 
-		ipList := make([]string, 0)
+		mapIPList := make(map[string]bool)
+		mapDomainList := make(map[string]bool)
 
 		for _, data := range c.ScanSuccessList {
 			res, ok := data.(*scanDirectResponse)
 			if !ok {
 				continue
 			}
-			ip := res.Request.IP
+
+			for _, netIP := range res.NetIPList {
+				ip := netIP.String()
+				mapIPList[ip] = true
+			}
+
+			mapDomainList[res.Request.Domain] = true
+		}
+
+		ipList := make([]string, 0)
+
+		for ip := range mapIPList {
 			ipList = append(ipList, ip)
 			c.Log(colorG1.Sprint(ip))
 		}
 
+		c.Log("")
+
+		domainList := make([]string, 0)
+
+		for doamin := range mapDomainList {
+			domainList = append(domainList, doamin)
+			c.Log(colorG1.Sprint(doamin))
+		}
+
+		outputList := make([]string, 0)
+		outputList = append(outputList, domainList...)
+		outputList = append(outputList, ipList...)
+
 		if scanDirectFlagOutput != "" {
-			err := os.WriteFile(scanDirectFlagOutput, []byte(strings.Join(ipList, "\n")), 0644)
+			err := os.WriteFile(scanDirectFlagOutput, []byte(strings.Join(outputList, "\n")), 0644)
 			if err != nil {
 				fmt.Println(err.Error())
 				os.Exit(1)

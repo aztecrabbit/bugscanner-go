@@ -279,9 +279,6 @@ func runScanCdnSsl(cmd *cobra.Command, args []string) {
 
 	for proxyHost := range proxyHostList {
 		for target := range targetList {
-			if target == "direct" {
-				target = proxyHost
-			}
 			queueScanner.Add(&queue_scanner.QueueScannerScanParams{
 				Name: fmt.Sprintf("%s:%d - %s", proxyHost, cdnSslFlagProxyPort, target),
 				Data: &scanCdnSslRequest{
