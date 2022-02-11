@@ -190,8 +190,8 @@ func scanDirectRun(cmd *cobra.Command, args []string) {
 		}
 
 		outputList := make([]string, 0)
-		outputList = append(outputList, domainList...)
 		outputList = append(outputList, ipList...)
+		outputList = append(outputList, domainList...)
 
 		if scanDirectFlagOutput != "" {
 			err := os.WriteFile(scanDirectFlagOutput, []byte(strings.Join(outputList, "\n")), 0644)
