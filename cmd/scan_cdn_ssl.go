@@ -189,7 +189,7 @@ func scanCdnSsl(c *queuescanner.Ctx, p *queuescanner.QueueScannerScanParams) {
 		}
 
 		if len(res.ResponseLine) == 0 || !strings.Contains(res.ResponseLine[0], " 101 ") {
-			c.Log(colorG2.Sprintf("%-32s  %s", proxyHostPort, strings.Join(res.ResponseLine, " -- ")))
+			c.Logf("%-32s  %s", proxyHostPort, strings.Join(res.ResponseLine, " -- "))
 			return
 		}
 
