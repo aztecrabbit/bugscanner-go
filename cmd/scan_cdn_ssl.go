@@ -133,7 +133,6 @@ func scanCdnSsl(c *queuescanner.Ctx, p *queuescanner.QueueScannerScanParams) {
 					}
 				}
 			}
-			c.Log(err.Error())
 			return
 		}
 		defer conn.Close()
@@ -189,13 +188,13 @@ func scanCdnSsl(c *queuescanner.Ctx, p *queuescanner.QueueScannerScanParams) {
 			}
 		}
 
-		if len(res.ResponseLine) == 0 {
-			c.Log(colorG2.Sprintf(proxyHostPort))
+		if len(res.ResponseLine) == 0 || !strings.Contains(res.ResponseLine[0], " 101 ") {
+			c.Log(colorG2.Sprintf("%-32s  %s", proxyHostPort, strings.Join(res.ResponseLine, " -- ")))
 			return
 		}
 
 		c.ScanSuccess(res, func() {
-			c.Log(colorG1.Sprintf("%-21s  %s", proxyHostPort, strings.Join(res.ResponseLine, " -- ")))
+			c.Log(colorG1.Sprintf("%-32s  %s", proxyHostPort, strings.Join(res.ResponseLine, " -- ")))
 		})
 
 		chanResult <- true
