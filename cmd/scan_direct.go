@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aztecrabbit/bugscanner-go/pkg/queue_scanner"
+	"github.com/aztecrabbit/bugscanner-go/pkg/queuescanner"
 	"github.com/spf13/cobra"
 )
 
@@ -66,7 +66,7 @@ var httpClient = &http.Client{
 
 var ctxBackground = context.Background()
 
-func scanDirect(c *queue_scanner.Ctx, p *queue_scanner.QueueScannerScanParams) {
+func scanDirect(c *queuescanner.Ctx, p *queuescanner.QueueScannerScanParams) {
 	req := p.Data.(*scanDirectRequest)
 
 	//
@@ -139,9 +139,9 @@ func scanDirectRun(cmd *cobra.Command, args []string) {
 
 	//
 
-	queueScanner := queue_scanner.NewQueueScanner(scanFlagThreads, scanDirect)
+	queueScanner := queuescanner.NewQueueScanner(scanFlagThreads, scanDirect)
 	for domain, _ := range domainList {
-		queueScanner.Add(&queue_scanner.QueueScannerScanParams{
+		queueScanner.Add(&queuescanner.QueueScannerScanParams{
 			Name: domain,
 			Data: &scanDirectRequest{
 				Domain: domain,
@@ -149,7 +149,7 @@ func scanDirectRun(cmd *cobra.Command, args []string) {
 			},
 		})
 	}
-	queueScanner.Start(func(c *queue_scanner.Ctx) {
+	queueScanner.Start(func(c *queuescanner.Ctx) {
 		if len(c.ScanSuccessList) == 0 {
 			return
 		}

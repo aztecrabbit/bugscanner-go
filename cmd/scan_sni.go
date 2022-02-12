@@ -12,7 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/aztecrabbit/bugscanner-go/pkg/queue_scanner"
+	"github.com/aztecrabbit/bugscanner-go/pkg/queuescanner"
 )
 
 var sniCmd = &cobra.Command{
@@ -38,7 +38,7 @@ func init() {
 	sniCmd.MarkFlagRequired("filename")
 }
 
-func scanSNI(c *queue_scanner.Ctx, p *queue_scanner.QueueScannerScanParams) {
+func scanSNI(c *queuescanner.Ctx, p *queuescanner.QueueScannerScanParams) {
 	domain := p.Data.(string)
 
 	//
@@ -106,9 +106,9 @@ func runScanSNI(cmd *cobra.Command, args []string) {
 
 	//
 
-	queueScanner := queue_scanner.NewQueueScanner(scanFlagThreads, scanSNI)
+	queueScanner := queuescanner.NewQueueScanner(scanFlagThreads, scanSNI)
 	for domain := range mapDomainList {
-		queueScanner.Add(&queue_scanner.QueueScannerScanParams{
+		queueScanner.Add(&queuescanner.QueueScannerScanParams{
 			Name: domain,
 			Data: domain,
 		})
