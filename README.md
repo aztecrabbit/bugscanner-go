@@ -1,5 +1,10 @@
 # Bugscanner Go
 
+This tool is dedicated to [DARKTUNNEL.NET](https://www.darktunnel.net), please support us if you find this tool useful.
+
+Join to our telegram group @darktunnel_group or click [here](https://t.me/darktunnel_group).
+
+
 Install
 -------
 
@@ -37,32 +42,26 @@ Visit subfinder repo if you want to install subfinder [here](https://github.com/
 
 ### Scanning
 
+#### Scan Direct
+
+	bugscanner-go scan direct -f example.com.lst -o cf.lst
+
+#### Scan CDN SSL
+
+	bugscanner-go scan cdn-ssl --proxy-filename cf.lst --target ws.example.com
+
+* target server response must be returning 101 status code.
+
 #### Scan Server Name Indication
 
 	bugscanner-go scan sni -f example.com.lst --threads 16 --timeout 8 --deep 3
 
-#### Scan CDN SSL
-
-	bugscanner-go scan cdn-ssl --cidr 127.0.0.1/32 --target example.com
-
-Please execute like this to see more options
-
-	bugscanner-go scan cdn-ssl --help
-
-How to find cidr of cdn? Just googling `cdn-name cidr` e.g. `cloudflare cidr`, etc.
-
 #### Note
 
-*Another subcommand for scanning will be updated soon*
+* Another subcommand for scanning will be updated soon.
 
 
 Updating
 --------
 
 	GOPROXY=direct go get -v github.com/aztecrabbit/bugscanner-go
-
-
-About
------
-
-This tool is dedicated to [DARKTUNNEL.NET](https://www.darktunnel.net), please support us if you find this tool useful.
