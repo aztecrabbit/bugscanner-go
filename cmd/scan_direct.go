@@ -140,7 +140,7 @@ func scanDirectRun(cmd *cobra.Command, args []string) {
 	//
 
 	queueScanner := queuescanner.NewQueueScanner(scanFlagThreads, scanDirect)
-	for domain, _ := range domainList {
+	for domain := range domainList {
 		queueScanner.Add(&queuescanner.QueueScannerScanParams{
 			Name: domain,
 			Data: &scanDirectRequest{
