@@ -8,7 +8,7 @@ Join to our telegram group @darktunnel_group or click [here](https://t.me/darktu
 Install
 -------
 
-	go get -v github.com/aztecrabbit/bugscanner-go
+	go install -v github.com/aztecrabbit/bugscanner-go@latest
 
 
 #### Add go bin to PATH
