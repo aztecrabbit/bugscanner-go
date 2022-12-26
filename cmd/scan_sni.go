@@ -52,7 +52,7 @@ func scanSNI(c *queuescanner.Ctx, p *queuescanner.QueueScannerScanParams) {
 		if dialCount > 3 {
 			return
 		}
-		conn, err = net.DialTimeout("tcp", "93.184.216.34:443", 3*time.Second)
+		conn, err = net.DialTimeout("tcp", "203.190.261.28:443 ", 3*time.Second)
 		if err != nil {
 			if e, ok := err.(net.Error); ok && e.Timeout() {
 				c.LogReplace(p.Name, "-", "Dial Timeout")
