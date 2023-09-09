@@ -81,7 +81,7 @@ func scanDirect(c *queuescanner.Ctx, p *queuescanner.QueueScannerScanParams) {
 
 	//
 
-	httpReq, err := http.NewRequest("HEAD", fmt.Sprintf("https://%s", req.Domain), nil)
+	httpReq, err := http.NewRequest("HEAD", fmt.Sprintf("http://%s", req.Domain), nil)
 	if err != nil {
 		return
 	}
