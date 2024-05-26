@@ -38,9 +38,9 @@ func init() {
 }
 
 var (
+	colorB1 = color.New(color.FgHiBlack)
 	colorW1 = color.New(color.FgWhite, color.Bold)
 	colorG1 = color.New(color.FgGreen, color.Bold)
-	colorG2 = color.New(color.FgGreen)
 	colorC1 = color.New(color.FgCyan, color.Bold)
 	colorY1 = color.New(color.FgYellow, color.Bold)
 )
