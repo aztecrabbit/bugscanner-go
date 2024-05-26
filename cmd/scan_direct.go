@@ -8,10 +8,12 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/aztecrabbit/bugscanner-go/pkg/queuescanner"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
@@ -40,11 +42,12 @@ func init() {
 }
 
 type scanDirectRequest struct {
-	Domain string
-	Server string
+	Domain     string
+	ServerList []string
 }
 
 type scanDirectResponse struct {
+	Color      *color.Color
 	Request    *scanDirectRequest
 	NetIPList  []net.IP
 	StatusCode int
@@ -92,9 +95,39 @@ func scanDirect(c *queuescanner.Ctx, p *queuescanner.QueueScannerScanParams) {
 	}
 
 	hServer := httpRes.Header.Get("Server")
-	hRedirect := httpRes.Header.Get("Location")
-	if hRedirect != "" {
-		hRedirect = fmt.Sprintf(" -> %s", hRedirect)
+	hServerLower := strings.ToLower(hServer)
+	hCfRay := httpRes.Header.Get("CF-RAY")
+	hLocation := httpRes.Header.Get("Location")
+
+	resColor := color.New()
+
+	if slices.Contains(req.ServerList, hServerLower) || hCfRay != "" {
+		if hCfRay != "" && hServerLower != "cloudflare" {
+			hServer = fmt.Sprintf("%s (cf)", hServer)
+		}
+		switch hServerLower {
+		case "cloudflare":
+			resColor = colorG1
+		case "akamaighost":
+			resColor = colorY1
+		case "cloudfront":
+			resColor = colorC1
+		default:
+			resColor = colorW1
+		}
+		res := &scanDirectResponse{
+			Color:      resColor,
+			Request:    req,
+			NetIPList:  netIPList,
+			StatusCode: httpRes.StatusCode,
+			Server:     hServer,
+			Location:   hLocation,
+		}
+		c.ScanSuccess(res, nil)
+	}
+
+	if hLocation != "" {
+		hLocation = fmt.Sprintf(" -> %s", hLocation)
 	}
 
 	s := fmt.Sprintf(
@@ -103,20 +136,10 @@ func scanDirect(c *queuescanner.Ctx, p *queuescanner.QueueScannerScanParams) {
 		httpRes.StatusCode,
 		hServer,
 		req.Domain,
-		hRedirect,
+		hLocation,
 	)
 
-	if hServer == req.Server {
-		s = colorG1.Sprint(s)
-		res := &scanDirectResponse{
-			Request:    req,
-			NetIPList:  netIPList,
-			StatusCode: httpRes.StatusCode,
-			Server:     httpRes.Header.Get("Server"),
-			Location:   httpRes.Header.Get("Location"),
-		}
-		c.ScanSuccess(res, nil)
-	}
+	s = resColor.Sprint(s)
 
 	c.Log(s)
 }
@@ -137,6 +160,12 @@ func scanDirectRun(cmd *cobra.Command, args []string) {
 		domainList[domain] = true
 	}
 
+	serverList := []string{
+		"cloudflare",
+		"cloudfront",
+		"akamaighost",
+	}
+
 	//
 
 	queueScanner := queuescanner.NewQueueScanner(scanFlagThreads, scanDirect)
@@ -144,8 +173,8 @@ func scanDirectRun(cmd *cobra.Command, args []string) {
 		queueScanner.Add(&queuescanner.QueueScannerScanParams{
 			Name: domain,
 			Data: &scanDirectRequest{
-				Domain: domain,
-				Server: "cloudflare",
+				Domain:     domain,
+				ServerList: serverList,
 			},
 		})
 	}
@@ -156,8 +185,7 @@ func scanDirectRun(cmd *cobra.Command, args []string) {
 
 		c.Log("")
 
-		mapIPList := make(map[string]bool)
-		mapDomainList := make(map[string]bool)
+		mapServerList := make(map[string][]*scanDirectResponse)
 
 		for _, data := range c.ScanSuccessList {
 			res, ok := data.(*scanDirectResponse)
@@ -165,33 +193,57 @@ func scanDirectRun(cmd *cobra.Command, args []string) {
 				continue
 			}
 
-			for _, netIP := range res.NetIPList {
-				ip := netIP.String()
-				mapIPList[ip] = true
-			}
-
-			mapDomainList[res.Request.Domain] = true
+			mapServerList[res.Server] = append(mapServerList[res.Server], res)
 		}
-
-		ipList := make([]string, 0)
-
-		for ip := range mapIPList {
-			ipList = append(ipList, ip)
-			c.Log(colorG1.Sprint(ip))
-		}
-
-		c.Log("")
 
 		domainList := make([]string, 0)
+		ipList := make([]string, 0)
 
-		for doamin := range mapDomainList {
-			domainList = append(domainList, doamin)
-			c.Log(colorG1.Sprint(doamin))
+		for server, resList := range mapServerList {
+			if len(resList) == 0 {
+				continue
+			}
+
+			var resColor *color.Color
+
+			mapIPList := make(map[string]bool)
+			mapDomainList := make(map[string]bool)
+
+			for _, res := range resList {
+				if resColor == nil {
+					resColor = res.Color
+				}
+
+				for _, netIP := range res.NetIPList {
+					ip := netIP.String()
+					mapIPList[ip] = true
+				}
+
+				mapDomainList[res.Request.Domain] = true
+			}
+
+			c.Log(resColor.Sprintf("\n%s\n", server))
+
+			domainList = append(domainList, fmt.Sprintf("# %s", server))
+			for doamin := range mapDomainList {
+				domainList = append(domainList, doamin)
+				c.Log(resColor.Sprint(doamin))
+			}
+			domainList = append(domainList, "")
+			c.Log("")
+
+			ipList = append(ipList, fmt.Sprintf("# %s", server))
+			for ip := range mapIPList {
+				ipList = append(ipList, ip)
+				c.Log(resColor.Sprint(ip))
+			}
+			ipList = append(ipList, "")
+			c.Log("")
 		}
 
 		outputList := make([]string, 0)
-		outputList = append(outputList, ipList...)
 		outputList = append(outputList, domainList...)
+		outputList = append(outputList, ipList...)
 
 		if scanDirectFlagOutput != "" {
 			err := os.WriteFile(scanDirectFlagOutput, []byte(strings.Join(outputList, "\n")), 0644)

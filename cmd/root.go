@@ -38,8 +38,11 @@ func init() {
 }
 
 var (
+	colorW1 = color.New(color.FgWhite, color.Bold)
 	colorG1 = color.New(color.FgGreen, color.Bold)
 	colorG2 = color.New(color.FgGreen)
+	colorC1 = color.New(color.FgCyan, color.Bold)
+	colorY1 = color.New(color.FgYellow, color.Bold)
 )
 
 // initConfig reads in config file and ENV variables if set.
