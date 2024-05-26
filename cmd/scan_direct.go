@@ -25,15 +25,17 @@ var scanDirectCmd = &cobra.Command{
 }
 
 var (
-	scanDirectFlagFilename string
-	scanDirectFlagTimeout  int
-	scanDirectFlagOutput   string
+	scanDirectFlagFilename   string
+	scanDirectFlagServerList string
+	scanDirectFlagTimeout    int
+	scanDirectFlagOutput     string
 )
 
 func init() {
 	scanCmd.AddCommand(scanDirectCmd)
 
 	scanDirectCmd.Flags().StringVarP(&scanDirectFlagFilename, "filename", "f", "", "domain list filename")
+	scanDirectCmd.Flags().StringVarP(&scanDirectFlagServerList, "server-list", "s", "all", "server list")
 	scanDirectCmd.Flags().IntVar(&scanDirectFlagTimeout, "timeout", 3, "connect timeout")
 	scanDirectCmd.Flags().StringVarP(&scanDirectFlagOutput, "output", "o", "", "output result")
 
@@ -101,19 +103,26 @@ func scanDirect(c *queuescanner.Ctx, p *queuescanner.QueueScannerScanParams) {
 
 	resColor := color.New()
 
-	if slices.Contains(req.ServerList, hServerLower) || hCfRay != "" {
-		if hCfRay != "" && hServerLower != "cloudflare" {
-			hServer = fmt.Sprintf("%s (cf)", hServer)
-		}
-		switch hServerLower {
-		case "cloudflare":
+	isHiddenCloudflare := slices.Contains(req.ServerList, "cloudflare") && hCfRay != "" && hServerLower != "cloudflare"
+
+	if slices.Contains(req.ServerList, hServerLower) || isHiddenCloudflare {
+		if isHiddenCloudflare {
 			resColor = colorG1
-		case "akamaighost":
-			resColor = colorY1
-		case "cloudfront":
-			resColor = colorC1
-		default:
-			resColor = colorW1
+			hServer = fmt.Sprintf("%s (cf)", hServer)
+		} else {
+			switch hServerLower {
+			case "cloudflare":
+				resColor = colorG1
+			case "akamaighost":
+				resColor = colorY1
+			case "cloudfront":
+				resColor = colorC1
+			default:
+				resColor = colorW1
+			}
+			if len(req.ServerList) == 1 {
+				resColor = colorG1
+			}
 		}
 		res := &scanDirectResponse{
 			Color:      resColor,
@@ -160,10 +169,18 @@ func scanDirectRun(cmd *cobra.Command, args []string) {
 		domainList[domain] = true
 	}
 
-	serverList := []string{
-		"cloudflare",
-		"cloudfront",
-		"akamaighost",
+	var serverList []string
+
+	scanDirectFlagServerListLower := strings.ToLower(scanDirectFlagServerList)
+
+	if scanDirectFlagServerListLower == "all" {
+		serverList = []string{
+			"cloudflare",
+			"cloudfront",
+			"akamaighost",
+		}
+	} else {
+		serverList = strings.Split(scanDirectFlagServerListLower, ",")
 	}
 
 	//
