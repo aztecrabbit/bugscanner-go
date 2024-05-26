@@ -8,7 +8,13 @@ Join to our telegram group @darktunnel_group or click [here](https://t.me/darktu
 Install
 -------
 
+**Latest Release**
+
 	go install -v github.com/aztecrabbit/bugscanner-go@latest
+
+**Latest Commit**
+
+	go install -v github.com/aztecrabbit/bugscanner-go@HEAD
 
 
 #### Add go bin to PATH
@@ -59,9 +65,3 @@ Visit subfinder repo if you want to install subfinder [here](https://github.com/
 #### Note
 
 * Another subcommand for scanning will be updated soon.
-
-
-Updating
---------
-
-	GOPROXY=direct go get -v github.com/aztecrabbit/bugscanner-go
