@@ -1,6 +1,6 @@
 package main
 
-import "github.com/aztecrabbit/bugscanner-go/cmd"
+import "github.com/saktiepoenya/bugscanner-go/cmd"
 
 func main() {
 	cmd.Execute()
