@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -12,7 +13,6 @@ import (
 	"time"
 
 	"github.com/aztecrabbit/bugscanner-go/pkg/queuescanner"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
@@ -83,16 +83,23 @@ func scanProxy(c *queuescanner.Ctx, p *queuescanner.QueueScannerScanParams) {
 	var conn net.Conn
 	var err error
 
+	dnsErr := new(net.DNSError)
+
 	proxyHostPort := fmt.Sprintf("%s:%d", req.ProxyHost, req.ProxyPort)
 	dialCount := 0
 
 	for {
 		dialCount++
 		if dialCount > 3 {
+			c.Log(colorB1.Sprintf("%s - Timeout", proxyHostPort))
 			return
 		}
 		conn, err = net.DialTimeout("tcp", proxyHostPort, 3*time.Second)
 		if err != nil {
+			if errors.As(err, &dnsErr) {
+				c.Log(colorB1.Sprint(proxyHostPort))
+				return
+			}
 			if e, ok := err.(net.Error); ok && e.Timeout() {
 				c.LogReplace(p.Name, "-", "Dial Timeout")
 				continue
@@ -147,15 +154,11 @@ func scanProxy(c *queuescanner.Ctx, p *queuescanner.QueueScannerScanParams) {
 			}
 		}
 
-		resColor := color.New()
+		resColor := colorD1
 
 		if len(res.ResponseLine) > 0 && strings.Contains(res.ResponseLine[0], " 101 ") {
 			resColor = colorG1
 			c.ScanSuccess(res, nil)
-		} else {
-			if len(res.ResponseLine) == 0 {
-				resColor = colorB1
-			}
 		}
 
 		c.Log(resColor.Sprintf("%-32s  %s", proxyHostPort, strings.Join(res.ResponseLine, " -- ")))
@@ -256,15 +259,23 @@ func runScanProxy(cmd *cobra.Command, args []string) {
 			return
 		}
 
-		c.Logf("")
+		c.Log("\n")
+
+		for _, scanSuccess := range c.ScanSuccessList {
+			res := scanSuccess.(*scanProxyResponse)
+			requestHostPort := fmt.Sprintf("%s:%d", res.Request.ProxyHost, res.Request.ProxyPort)
+			requestTargetBug := fmt.Sprintf("%s -- %s", res.Request.Target, res.Request.Bug)
+			if res.Request.Target == res.Request.Bug {
+				requestTargetBug = res.Request.Target
+			}
+			c.Log(colorG1.Sprintf("%-32s  %s -- %s", requestHostPort, requestTargetBug, res.Request.Payload))
+		}
 
 		jsonBytes, err := json.MarshalIndent(c.ScanSuccessList, "", "  ")
 		if err != nil {
 			fmt.Println(err.Error())
 			os.Exit(1)
 		}
-
-		fmt.Println(string(jsonBytes))
 
 		if scanProxyFlagOutput != "" {
 			err := os.WriteFile(scanProxyFlagOutput, jsonBytes, 0644)
