@@ -27,6 +27,7 @@ var scanDirectCmd = &cobra.Command{
 var (
 	scanDirectFlagFilename   string
 	scanDirectFlagServerList string
+	scanDirectFlagHttps      bool
 	scanDirectFlagTimeout    int
 	scanDirectFlagOutput     string
 )
@@ -36,6 +37,7 @@ func init() {
 
 	scanDirectCmd.Flags().StringVarP(&scanDirectFlagFilename, "filename", "f", "", "domain list filename")
 	scanDirectCmd.Flags().StringVarP(&scanDirectFlagServerList, "server-list", "s", "all", "server list")
+	scanDirectCmd.Flags().BoolVar(&scanDirectFlagHttps, "https", false, "use https")
 	scanDirectCmd.Flags().IntVar(&scanDirectFlagTimeout, "timeout", 3, "connect timeout")
 	scanDirectCmd.Flags().StringVarP(&scanDirectFlagOutput, "output", "o", "", "output result")
 
@@ -45,6 +47,7 @@ func init() {
 
 type scanDirectRequest struct {
 	Domain     string
+	Https      bool
 	ServerList []string
 }
 
@@ -74,8 +77,6 @@ var ctxBackground = context.Background()
 func scanDirect(c *queuescanner.Ctx, p *queuescanner.QueueScannerScanParams) {
 	req := p.Data.(*scanDirectRequest)
 
-	//
-
 	ctxTimeout, cancel := context.WithTimeout(ctxBackground, 3*time.Second)
 	defer cancel()
 	netIPList, err := net.DefaultResolver.LookupIP(ctxTimeout, "ip4", req.Domain)
@@ -84,9 +85,12 @@ func scanDirect(c *queuescanner.Ctx, p *queuescanner.QueueScannerScanParams) {
 	}
 	ip := netIPList[0].String()
 
-	//
+	httpScheme := "http"
+	if req.Https {
+		httpScheme = "https"
+	}
 
-	httpReq, err := http.NewRequest("HEAD", fmt.Sprintf("http://%s", req.Domain), nil)
+	httpReq, err := http.NewRequest("HEAD", fmt.Sprintf("%s://%s", httpScheme, req.Domain), nil)
 	if err != nil {
 		return
 	}
@@ -191,6 +195,7 @@ func scanDirectRun(cmd *cobra.Command, args []string) {
 			Name: domain,
 			Data: &scanDirectRequest{
 				Domain:     domain,
+				Https:      scanDirectFlagHttps,
 				ServerList: serverList,
 			},
 		})
